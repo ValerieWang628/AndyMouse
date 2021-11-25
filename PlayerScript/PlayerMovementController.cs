@@ -4,17 +4,23 @@ using UnityEngine;
 
 public class PlayerMovementController : MonoBehaviour
 {
+    #region Basic
+
     private Rigidbody2D thisRigidBody;
     private Vector2 thisAxisInput;
+    private Vector2 thisFaceDirection;
+    #endregion
 
+    #region Run
     [Header("Run")]
     [SerializeField] private float runSpeed;
     [Range(0f, 30f)] [SerializeField] private float runAcceleration = 15f;
     [Range(0f, 30f)] [SerializeField] private float runDeceleration = 20f;
     [Range(0.2f, 1f)][SerializeField] private float pow = 0.9f;
     [Space(10)] [SerializeField] private float frictionAmount = 0.15f;
+    #endregion
 
-
+    #region Jump
     [Header("Jump")]
     [SerializeField] private float jumpForce;
     [Range(0f, 1f)] [SerializeField] private float airControlMultiplier = 0.6f;
@@ -24,27 +30,33 @@ public class PlayerMovementController : MonoBehaviour
     private float coyoteTimer;
     [Range(0f, 0.3f)] [SerializeField] private float jumpBufferDuration = 0.1f;
     private float jumpBufferTimer;
+    #endregion
 
-
+    #region GroundCheck
     [Header("GroundCheck")]
     [SerializeField] private Transform groundCheckPoint;
     [SerializeField] private LayerMask groudLayer;
+    #endregion
 
-
-    [Header("Shoot")]
+    #region NormalShoot
+    [Header("NormalShoot")]
     [SerializeField] private GameObject bulletPrefab;
     [SerializeField] private Transform bulletPoint;
-    [SerializeField] private Transform bulletPointCeiling;
-    private Vector3 ceilingPos;
-    private int dir;
-    [SerializeField] private Transform bulletPointFloor;
-    private Vector3 beanBulletPoint;
     [SerializeField] private float bulletCoolDownDuration;
     private float bulletCoolDownTimer;
+    #endregion
 
-    [Space(10)]
+    #region PowerShoot - BeanWave
+    [Header("PowerShoot - BeanWave")]
+    [SerializeField] private int beanNum = 30;
+    [SerializeField] private float beanInterval = 0.08f; //shoot freq
+    [SerializeField] private float waveMagnitudeMultiplier = 2f;
+
+    private bool isBeanActivated = true; // accumulate after a few normal hits
+    private Vector3 beanBulletSpawnPoint;
     [SerializeField] private GameObject beanBulletPrefab;
-    [SerializeField] private AnimationCurve beanPointMovement;
+    [SerializeField] private AnimationCurve beanPointMoveCurve;
+    #endregion
 
     private void Start()
     {
@@ -58,6 +70,17 @@ public class PlayerMovementController : MonoBehaviour
 
         thisAxisInput.x = Input.GetAxisRaw("Horizontal");
         thisAxisInput.y = Input.GetAxisRaw("Vertical");
+
+        if (thisAxisInput.x == -1)
+        {
+            this.transform.localScale = new Vector3(-1, 1, 1);
+            thisFaceDirection = Vector2.left;
+        }
+        else if (thisAxisInput.x == 1)
+        {
+            this.transform.localScale = new Vector3(1, 1, 1);
+            thisFaceDirection = Vector2.right;
+        }
         #endregion
 
 
@@ -101,26 +124,28 @@ public class PlayerMovementController : MonoBehaviour
                 GameObject aBullet = PoolManager.instance.GetObjFromPool("Bullet");
                 aBullet.SetActive(true);
                 aBullet.transform.position = bulletPoint.position;
-                aBullet.GetComponent<BananaBulletMovement>().ReceiveMomentum(Vector2.right);
+                aBullet.GetComponent<BananaBulletMovement>().ReceiveMomentum(thisFaceDirection);
 
-                //GameObject aBullet = Instantiate(bulletPrefab, bulletPoint.position, Quaternion.identity);
-                //aBullet.GetComponent<BananaBulletScript>().ReceiveMomentum(Vector2.right);
                 bulletCoolDownTimer = bulletCoolDownDuration;
             }
             else
             {
                 bulletCoolDownTimer -= Time.deltaTime;
             }
-            //InvokeRepeating("Shoot", 0.15f, 0.15f);
-
-            #endregion
         }
+        #endregion
+
+
+        #region ShootBeanBullet
 
         if (Input.GetButtonDown("Fire2"))
         {
-            beanBulletPoint = bulletPoint.position;
-            StartCoroutine(ShootBeanBullets(30));
+            if (isBeanActivated)
+            {
+                StartCoroutine(ShootBeanBullets(beanNum, bulletPoint.position, thisFaceDirection));
+            }
         }
+        #endregion
     }
 
     private void FixedUpdate()
@@ -148,28 +173,28 @@ public class PlayerMovementController : MonoBehaviour
 
 
     }
-
-    private void Shoot(int i)
+ 
+    private void Shoot(int i, bool isUp, Vector3 offsetPoint, Vector3 faceDir)
     {
-        ceilingPos = bulletPointCeiling.position;
+        int dir = (isUp) ? 1 : -1;
 
-        //if (beanBulletPoint.y >= ceilingPos.y) { dir = -1; }
-        //if (beanBulletPoint.y <= bulletPoint.position.y) { dir = 1;}
+       //bullet point is offset
+       beanBulletSpawnPoint = offsetPoint + new Vector3(0, beanPointMoveCurve.Evaluate(i) * waveMagnitudeMultiplier * dir, 0);
 
-        //beanBulletPoint += transform.up * 0.2f * dir;
-        //beanBulletPoint += transform.up * (beanPointMovement.Evaluate(i)/10) * dir;
-        beanBulletPoint = bulletPoint.position + new Vector3(0, beanPointMovement.Evaluate(i), 0);
-
-        GameObject aBullet = Instantiate(beanBulletPrefab, beanBulletPoint, Quaternion.identity);
-        aBullet.GetComponent<BananaBulletMovement>().ReceiveMomentum(Vector2.right);
+        GameObject aBullet = PoolManager.instance.GetObjFromPool("BeanBullet");
+        aBullet.SetActive(true);
+        aBullet.transform.position = beanBulletSpawnPoint;
+        aBullet.GetComponent<BananaBulletMovement>().ReceiveMomentum(faceDir);
     }
 
-    private IEnumerator ShootBeanBullets(int repeatCount)
+    private IEnumerator ShootBeanBullets(int repeatCount, Vector3 offsetPoint, Vector3 faceDir)
     {
         for (int i = 0; i < repeatCount + 1; i++)
         {
-            Shoot(i);
-            yield return new WaitForSeconds(0.05f);
+            Shoot(i, true, offsetPoint, faceDir);
+            Shoot(i, false, offsetPoint, faceDir);
+            yield return new WaitForSeconds(beanInterval);
         }
     }
+
 }
