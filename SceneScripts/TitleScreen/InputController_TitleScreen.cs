@@ -2,13 +2,12 @@
 
 public class InputController_TitleScreen : MonoBehaviour
 {
-
-    // Update is called once per frame
     void Update()
     {
-        if (Input.anyKey)
+        if (Input.anyKeyDown && 
+            !(Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2)))
         {
-            SceneToolManager.instance.SwitchToScene("TitleScreen_Options");
+            SceneToolManager.instance.SwitchToScene("S_TitleScreen_Options");
         }
     }
 }

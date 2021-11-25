@@ -20,14 +20,4 @@ public class ButtonController : MonoBehaviour
 
         SceneToolManager.instance.SwitchToScene("S_LevelSelection");
     }
-
-    public void OnExitClicked()
-    {
-#if UNITY_EDITOR
-
-        UnityEditor.EditorApplication.isPlaying = false;
-#else
-        Application.Quit();
-#endif
-    }
 }
